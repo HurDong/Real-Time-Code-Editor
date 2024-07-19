@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Real Time Code Editor</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.4.0/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <style>
+        #editor {
+            width: 80%;
+            height: 500px;
+            border: 1px solid #ccc;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div id="editor" contenteditable="true"></div>
+
+    <script>
+        var stompClient = null;
+        var isComposing = false;
+
+        function connect() {
+            var socket = new SockJS('/ws');
+            stompClient = Stomp.over(socket);
+            stompClient.connect({}, function (frame) {
+                stompClient.subscribe('/topic/code', function (codeMessage) {
+                    var message = JSON.parse(codeMessage.body);
+                    if (!isComposing) {
+                        document.getElementById("editor").innerText = message.content;
+                    }
+                });
+            });
+        }
+
+        function sendCode(content) {
+            stompClient.send("/app/code.edit", {}, JSON.stringify({'content': content, 'sender': 'user', 'type': 'edit'}));
+        }
+
+        document.getElementById("editor").addEventListener("compositionstart", function() {
+            isComposing = true;
+        });
+
+        document.getElementById("editor").addEventListener("compositionend", function() {
+            isComposing = false;
+            sendCode(this.innerText);
+        });
+
+        document.getElementById("editor").addEventListener("input", function() {
+            if (!isComposing) {
+                sendCode(this.innerText);
+            }
+        });
+
+        connect();
+    </script>
+</body>
+</html>
